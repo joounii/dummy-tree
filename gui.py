@@ -1,15 +1,12 @@
-from typing import Any, Dict, Optional
+# gui.py
+from typing import Any, ContextManager, Optional, cast
 import dearpygui.dearpygui as dpg
+from config import DEFAULT_CONFIG, GeneratorConfig
 
 
-def get_config_ui() -> Optional[Dict[str, Any]]:
-    """Opens the configuration UI and returns the user inputs as a dictionary.
-
-    Returns:
-        dict: The parsed configuration if submitted.
-        None: If the user closed the window without submitting.
-    """
-    config: Dict[str, Any] = {}
+def get_config_ui() -> Optional[GeneratorConfig]:
+    """Opens configuration UI and returns the user inputs as a GeneratorConfig instance."""
+    result_config: Optional[GeneratorConfig] = None
 
     def browse_native_windows_folder():
         import tkinter as tk
@@ -37,6 +34,7 @@ def get_config_ui() -> Optional[Dict[str, Any]]:
         dpg.set_value("max_depth_input", clamped)
 
     def on_submit():
+        nonlocal result_config
         raw_exts = dpg.get_value("f_extensions")
         parsed_exts = [
             ext.strip() if ext.strip().startswith(".") else f".{ext.strip()}"
@@ -44,21 +42,21 @@ def get_config_ui() -> Optional[Dict[str, Any]]:
             if ext.strip()
         ]
 
-        config["ROOT_DIR"] = dpg.get_value("root_dir")
-        config["MAX_DEPTH"] = dpg.get_value("max_depth_slider")
-        config["MIN_SUBFOLDERS"] = dpg.get_value("min_subfolders")
-        config["MAX_SUBFOLDERS"] = dpg.get_value("max_subfolders")
-        config["MIN_FILES_PER_FOLDER"] = dpg.get_value("min_files")
-        config["MAX_FILES_PER_FOLDER"] = dpg.get_value("max_files")
-        config["FILE_EXTENSIONS"] = parsed_exts
-        config["MIN_FILE_SIZE_KB"] = dpg.get_value("min_size")
-        config["MAX_FILE_SIZE_KB"] = dpg.get_value("max_size")
-        config["FILL_CONTENT"] = dpg.get_value("fill_content")
-        config["COMPRESS_TO_ZIP"] = dpg.get_value("compress_to_zip")
-
+        result_config = GeneratorConfig(
+            root_dir=dpg.get_value("root_dir"),
+            max_depth=dpg.get_value("max_depth_slider"),
+            min_subfolders=dpg.get_value("min_subfolders"),
+            max_subfolders=dpg.get_value("max_subfolders"),
+            min_files_per_folder=dpg.get_value("min_files"),
+            max_files_per_folder=dpg.get_value("max_files"),
+            file_extensions=parsed_exts,
+            min_file_size_kb=dpg.get_value("min_size"),
+            max_file_size_kb=dpg.get_value("max_size"),
+            fill_content=dpg.get_value("fill_content"),
+            compress_to_zip=dpg.get_value("compress_to_zip"),
+        )
         dpg.stop_dearpygui()
 
-    # Initialize Dear PyGui lifecycle
     dpg.create_context()
     dpg.create_viewport(
         title="Mock Environment Generator Setup",
@@ -67,22 +65,24 @@ def get_config_ui() -> Optional[Dict[str, Any]]:
         resizable=False,
     )
 
-    with dpg.window(tag="PrimaryWindow"):
+    with cast(ContextManager[Any], dpg.window(tag="PrimaryWindow")):
         dpg.add_text("Directory & Subfolders", color=(100, 200, 255))
 
-        with dpg.group(horizontal=True):
+        with cast(ContextManager[Any], dpg.group(horizontal=True)):
             dpg.add_input_text(
-                tag="root_dir", default_value=r".\mock_environment", width=340
+                tag="root_dir",
+                default_value=DEFAULT_CONFIG.root_dir,
+                width=340,
             )
             dpg.add_button(
                 label="Browse...", callback=browse_native_windows_folder
             )
             dpg.add_text("Root Dir")
 
-        with dpg.group(horizontal=True):
+        with cast(ContextManager[Any], dpg.group(horizontal=True)):
             dpg.add_slider_int(
                 tag="max_depth_slider",
-                default_value=4,
+                default_value=DEFAULT_CONFIG.max_depth,
                 min_value=0,
                 max_value=20,
                 clamped=True,
@@ -91,7 +91,7 @@ def get_config_ui() -> Optional[Dict[str, Any]]:
             )
             dpg.add_input_int(
                 tag="max_depth_input",
-                default_value=4,
+                default_value=DEFAULT_CONFIG.max_depth,
                 min_value=0,
                 min_clamped=True,
                 step=0,
@@ -104,14 +104,14 @@ def get_config_ui() -> Optional[Dict[str, Any]]:
         dpg.add_input_int(
             label="Min Subfolders",
             tag="min_subfolders",
-            default_value=1,
+            default_value=DEFAULT_CONFIG.min_subfolders,
             min_value=0,
             min_clamped=True,
         )
         dpg.add_input_int(
             label="Max Subfolders",
             tag="max_subfolders",
-            default_value=3,
+            default_value=DEFAULT_CONFIG.max_subfolders,
             min_value=0,
             min_clamped=True,
         )
@@ -124,33 +124,33 @@ def get_config_ui() -> Optional[Dict[str, Any]]:
         dpg.add_input_int(
             label="Min Files / Folder",
             tag="min_files",
-            default_value=2,
+            default_value=DEFAULT_CONFIG.min_files_per_folder,
             min_value=0,
             min_clamped=True,
         )
         dpg.add_input_int(
             label="Max Files / Folder",
             tag="max_files",
-            default_value=6,
+            default_value=DEFAULT_CONFIG.max_files_per_folder,
             min_value=0,
             min_clamped=True,
         )
         dpg.add_input_text(
             label="File Extensions",
             tag="f_extensions",
-            default_value=".txt, .log, .dat, .bin",
+            default_value=DEFAULT_CONFIG.file_extensions_str,
         )
         dpg.add_input_int(
             label="Min File Size (KB)",
             tag="min_size",
-            default_value=4,
+            default_value=DEFAULT_CONFIG.min_file_size_kb,
             min_value=0,
             min_clamped=True,
         )
         dpg.add_input_int(
             label="Max File Size (KB)",
             tag="max_size",
-            default_value=64,
+            default_value=DEFAULT_CONFIG.max_file_size_kb,
             min_value=0,
             min_clamped=True,
         )
@@ -168,12 +168,12 @@ def get_config_ui() -> Optional[Dict[str, Any]]:
             ],
             label="Fill Content",
             tag="fill_content",
-            default_value="Zero Bytes (Instant)",
+            default_value=DEFAULT_CONFIG.fill_content,
         )
         dpg.add_checkbox(
             label="Compress output to ZIP",
             tag="compress_to_zip",
-            default_value=False,
+            default_value=DEFAULT_CONFIG.compress_to_zip,
         )
 
         dpg.add_spacer(height=12)
@@ -187,7 +187,7 @@ def get_config_ui() -> Optional[Dict[str, Any]]:
     dpg.start_dearpygui()
     dpg.destroy_context()
 
-    return config if config else None
+    return result_config
 
 
 if __name__ == "__main__":

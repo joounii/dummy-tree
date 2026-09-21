@@ -1,37 +1,18 @@
+# main.py
 import os
 import random
 import shutil
 import string
+from dataclasses import asdict
 from pathlib import Path
 from typing import List
+
+from config import DEFAULT_CONFIG, GeneratorConfig
 from gui import get_config_ui
 
 debug = False
 
-# ==========================================
-# DEFAULT VARIABLES
-# ==========================================
-ROOT_DIR: str = r"./mock_environment"
-COMPRESS_TO_ZIP: bool = False
 
-# Subfolder Structure
-MAX_DEPTH: int = 4                # 0 = only root folder, 1 = root + direct children, etc.
-MIN_SUBFOLDERS: int = 1           # Min subfolders created inside each directory
-MAX_SUBFOLDERS: int = 3           # Max subfolders created inside each directory
-
-# Files
-MIN_FILES_PER_FOLDER: int = 2     # Min files placed inside each directory
-MAX_FILES_PER_FOLDER: int = 6     # Max files placed inside each directory
-FILE_EXTENSIONS: List[str] = [".txt", ".log", ".dat", ".bin"]
-MIN_FILE_SIZE_KB: int = 4         # Min file size
-MAX_FILE_SIZE_KB: int = 64        # Max file size
-
-# Content strategy
-FILL_CONTENT: str = "Zero Bytes (Instant)"  # Options: "Zero Bytes (Instant)", "Random Bytes", "Repeated ASCII Text"
-
-# ==========================================
-# CORE LOGIC
-# ==========================================
 def generate_file_content(fill_mode: str, size_bytes: int) -> bytes:
     """Generates file content based on the chosen fill mode."""
     if size_bytes <= 0:
@@ -46,11 +27,12 @@ def generate_file_content(fill_mode: str, size_bytes: int) -> bytes:
         repeats = (size_bytes // len(sample_chars)) + 1
         return (sample_chars * repeats)[:size_bytes]
 
-    # Default: "Zero Bytes (Instant)"
     return b"\x00" * size_bytes
 
 
-def create_dummy_file(file_path: Path, fill_mode: str, min_kb: int, max_kb: int) -> None:
+def create_dummy_file(
+    file_path: Path, fill_mode: str, min_kb: int, max_kb: int
+) -> None:
     """Writes a dummy file with a randomized size between min_kb and max_kb."""
     min_size = max(0, min_kb)
     max_size = max(min_size, max_kb)
@@ -71,62 +53,63 @@ def create_dummy_file(file_path: Path, fill_mode: str, min_kb: int, max_kb: int)
 def populate_directory(
     current_dir: Path,
     current_depth: int,
-    max_depth: int,
-    min_subfolders: int,
-    max_subfolders: int,
-    min_files: int,
-    max_files: int,
-    file_extensions: List[str],
-    min_size_kb: int,
-    max_size_kb: int,
-    fill_mode: str,
+    cfg: GeneratorConfig,
     stats: dict,
 ) -> None:
     """Recursively creates files and child folders up to max_depth."""
     current_dir.mkdir(parents=True, exist_ok=True)
     stats["total_folders"] += 1
 
-    # 1. Generate files in the current directory
-    file_count = random.randint(min_files, max(min_files, max_files))
+    # 1. Generate files
+    min_f = cfg.min_files_per_folder
+    max_f = max(min_f, cfg.max_files_per_folder)
+    file_count = random.randint(min_f, max_f)
+
     for i in range(1, file_count + 1):
-        ext = random.choice(file_extensions)
+        ext = random.choice(cfg.file_extensions)
         file_name = f"data_{i:03d}_{random.randint(1000, 9999)}{ext}"
-        create_dummy_file(current_dir / file_name, fill_mode, min_size_kb, max_size_kb)
+        create_dummy_file(
+            current_dir / file_name,
+            cfg.fill_content,
+            cfg.min_file_size_kb,
+            cfg.max_file_size_kb,
+        )
         stats["total_files"] += 1
 
-    # 2. Base case: stop creating subfolders if max depth reached
-    if current_depth >= max_depth:
+    # 2. Base case
+    if current_depth >= cfg.max_depth:
         return
 
     # 3. Generate child subfolders recursively
-    subfolder_count = random.randint(min_subfolders, max(min_subfolders, max_subfolders))
+    min_sub = cfg.min_subfolders
+    max_sub = max(min_sub, cfg.max_subfolders)
+    subfolder_count = random.randint(min_sub, max_sub)
+
     for i in range(1, subfolder_count + 1):
-        child_dir = current_dir / f"level_{current_depth + 1}_sub_{i:02d}_{random.randint(100, 999)}"
+        child_dir = (
+            current_dir
+            / f"level_{current_depth + 1}_sub_{i:02d}_{random.randint(100, 999)}"
+        )
         populate_directory(
             current_dir=child_dir,
             current_depth=current_depth + 1,
-            max_depth=max_depth,
-            min_subfolders=min_subfolders,
-            max_subfolders=max_subfolders,
-            min_files=min_files,
-            max_files=max_files,
-            file_extensions=file_extensions,
-            min_size_kb=min_size_kb,
-            max_size_kb=max_size_kb,
-            fill_mode=fill_mode,
+            cfg=cfg,
             stats=stats,
         )
 
-def compress_directory(directory_path: Path, delete_original: bool = True) -> Path:
+
+def compress_directory(
+    directory_path: Path, delete_original: bool = True
+) -> Path:
     """Compresses the given directory into a .zip archive and removes the original folder."""
     base_name = str(directory_path)
     print(f"[+] Compressing to: {base_name}.zip ...")
-    
+
     zip_filepath = shutil.make_archive(
         base_name=base_name,
         format="zip",
         root_dir=directory_path.parent,
-        base_dir=directory_path.name
+        base_dir=directory_path.name,
     )
 
     if delete_original:
@@ -136,84 +119,51 @@ def compress_directory(directory_path: Path, delete_original: bool = True) -> Pa
     print(f"[✓] Archive created at: {zip_filepath}")
     return Path(zip_filepath)
 
-def generate_test_environment(
-    root_dir: str,
-    max_depth: int,
-    min_subfolders: int,
-    max_subfolders: int,
-    min_files_per_folder: int,
-    max_files_per_folder: int,
-    file_extensions: List[str],
-    min_file_size_kb: int,
-    max_file_size_kb: int,
-    fill_content: str,
-    compress_to_zip: bool,
-) -> dict:
-    """Entry point for generating a recursive test directory tree."""
-    base_path = Path(root_dir).resolve()
 
-    clean_exts = [ext if ext.startswith(".") else f".{ext}" for ext in file_extensions]
-    if not clean_exts:
-        clean_exts = [".dat"]
+def generate_test_environment(cfg: GeneratorConfig) -> dict:
+    """Entry point for generating a recursive test directory tree."""
+    base_path = Path(cfg.root_dir).resolve()
+
+    # Normalize extensions
+    cfg.file_extensions = [
+        ext if ext.startswith(".") else f".{ext}" for ext in cfg.file_extensions
+    ] or [".dat"]
 
     stats = {"total_folders": 0, "total_files": 0}
-
     print(f"[+] Generating tree at: {base_path}")
-    print(f"[+] Max Depth: {max_depth} | Fill Strategy: {fill_content}")
+    print(f"[+] Max Depth: {cfg.max_depth} | Fill Strategy: {cfg.fill_content}")
 
     populate_directory(
         current_dir=base_path,
         current_depth=0,
-        max_depth=max_depth,
-        min_subfolders=min_subfolders,
-        max_subfolders=max_subfolders,
-        min_files=min_files_per_folder,
-        max_files=max_files_per_folder,
-        file_extensions=clean_exts,
-        min_size_kb=min_file_size_kb,
-        max_size_kb=max_file_size_kb,
-        fill_mode=fill_content,
+        cfg=cfg,
         stats=stats,
     )
 
-    print(f"[✓] Done! Generated {stats['total_files']} files across {stats['total_folders']} folders.")
-    if compress_to_zip:
+    print(
+        f"[✓] Done! Generated {stats['total_files']} files across {stats['total_folders']} folders."
+    )
+
+    zip_path = None
+    if cfg.compress_to_zip:
         zip_path = str(compress_directory(base_path, delete_original=True))
 
     return {
-        "root_path": str(base_path) if not compress_to_zip else None,
+        "root_path": str(base_path) if not cfg.compress_to_zip else None,
         "zip_path": zip_path,
         **stats,
     }
 
 
-# ==========================================
-# ENTRY POINT
-# ==========================================
 if __name__ == "__main__":
-
     config = get_config_ui()
 
     if config:
         if debug:
             print("User submitted:")
-            for key, val in config.items():
+            for key, val in asdict(config).items():
                 print(f"{key}: {val}")
 
-        generate_test_environment(
-            root_dir=config["ROOT_DIR"],
-            max_depth=config["MAX_DEPTH"],
-            min_subfolders=config["MIN_SUBFOLDERS"],
-            max_subfolders=config["MAX_SUBFOLDERS"],
-            min_files_per_folder=config["MIN_FILES_PER_FOLDER"],
-            max_files_per_folder=config["MAX_FILES_PER_FOLDER"],
-            file_extensions=config["FILE_EXTENSIONS"],
-            min_file_size_kb=config["MIN_FILE_SIZE_KB"],
-            max_file_size_kb=config["MAX_FILE_SIZE_KB"],
-            fill_content=config["FILL_CONTENT"],
-            compress_to_zip=config["COMPRESS_TO_ZIP"],
-        )
+        generate_test_environment(config)
     else:
         print("User closed the window without submitting.")
-
-    
