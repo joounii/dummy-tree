@@ -1,5 +1,6 @@
 import os
 import random
+import shutil
 import string
 from pathlib import Path
 from typing import List
@@ -11,6 +12,7 @@ debug = False
 # DEFAULT VARIABLES
 # ==========================================
 ROOT_DIR: str = r"./mock_environment"
+COMPRESS_TO_ZIP: bool = False
 
 # Subfolder Structure
 MAX_DEPTH: int = 4                # 0 = only root folder, 1 = root + direct children, etc.
@@ -115,6 +117,24 @@ def populate_directory(
             stats=stats,
         )
 
+def compress_directory(directory_path: Path, delete_original: bool = True) -> Path:
+    """Compresses the given directory into a .zip archive and removes the original folder."""
+    base_name = str(directory_path)
+    print(f"[+] Compressing to: {base_name}.zip ...")
+    
+    zip_filepath = shutil.make_archive(
+        base_name=base_name,
+        format="zip",
+        root_dir=directory_path.parent,
+        base_dir=directory_path.name
+    )
+
+    if delete_original:
+        shutil.rmtree(directory_path)
+        print(f"[✓] Removed original uncompressed directory: {directory_path}")
+
+    print(f"[✓] Archive created at: {zip_filepath}")
+    return Path(zip_filepath)
 
 def generate_test_environment(
     root_dir: str,
@@ -127,6 +147,7 @@ def generate_test_environment(
     min_file_size_kb: int,
     max_file_size_kb: int,
     fill_content: str,
+    compress_to_zip: bool,
 ) -> dict:
     """Entry point for generating a recursive test directory tree."""
     base_path = Path(root_dir).resolve()
@@ -156,8 +177,12 @@ def generate_test_environment(
     )
 
     print(f"[✓] Done! Generated {stats['total_files']} files across {stats['total_folders']} folders.")
+    if compress_to_zip:
+        zip_path = str(compress_directory(base_path, delete_original=True))
+
     return {
-        "root_path": str(base_path),
+        "root_path": str(base_path) if not compress_to_zip else None,
+        "zip_path": zip_path,
         **stats,
     }
 
@@ -172,16 +197,8 @@ if __name__ == "__main__":
     if config:
         if debug:
             print("User submitted:")
-            print("Root dir: " + config["ROOT_DIR"])
-            print("max depth: " + config["MAX_DEPTH"])
-            print("min subfolders: " + config["MIN_SUBFOLDERS"])
-            print("max sub folders: " + config["MAX_SUBFOLDERS"])
-            print("max files per folder: " + config["MAX_FILES_PER_FOLDER"])
-            print("file extensions: " + config["FILE_EXTENSIONS"])
-            print("min file size: " + config["MIN_FILE_SIZE_KB"])
-            print("max file size: " + config["MAX_FILE_SIZE_KB"])
-            print("fill content: " + config["FILL_CONTENT"])
-            print("compress to zip: " + config["COMPRESS_TO_ZIP"])
+            for key, val in config.items():
+                print(f"{key}: {val}")
 
         generate_test_environment(
             root_dir=config["ROOT_DIR"],
@@ -194,6 +211,7 @@ if __name__ == "__main__":
             min_file_size_kb=config["MIN_FILE_SIZE_KB"],
             max_file_size_kb=config["MAX_FILE_SIZE_KB"],
             fill_content=config["FILL_CONTENT"],
+            compress_to_zip=config["COMPRESS_TO_ZIP"],
         )
     else:
         print("User closed the window without submitting.")
