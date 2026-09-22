@@ -13,6 +13,7 @@ A lightweight desktop utility to quickly generate nested dummy folder structures
   - `Zero Bytes (Instant)`: Fast allocation using sparse/null bytes.
   - `Random Bytes`: Generates raw random byte sequences.
   - `Repeated ASCII Text`: Fills files with readable alphanumeric text.
+- **Archive Export**: Option to compress the generated directory structure directly into a `.zip` archive.
 - **GUI Interface**: Easy-to-use graphical interface powered by Dear PyGui.
 
 ---
@@ -31,15 +32,17 @@ Install the required GUI dependency via pip:
 pip install dearpygui
 ```
 
-*(All other modules used—`os`, `random`, `string`, `pathlib`, `typing`—are built into Python standard libraries).*
+*(All other modules used (`os`, `random`, `string`, `pathlib`, `typing`, `zipfile`) are built into Python standard libraries).*
 
 ### 3. File Setup
 
 Ensure your project files are in the same folder:
 
 ```text
-├── main.py          # Main generator script
-└── gui.py           # GUI interface module (defines get_config_ui)
+├── config.py        # Configuration data structures and defaults
+├── gui.py           # GUI interface module (Dear PyGui layout & inputs)
+├── main.py          # Application entry point and generation logic
+└── popup.py         # Modal dialogs and status popup windows
 ```
 
 ---
@@ -61,14 +64,9 @@ python main.py
    - **File Size (Min / Max in KB)**: Target size range for generated files.
    - **File Extensions**: Extensions to randomly assign to created files.
    - **Fill Content**: How the dummy data should be populated.
+   - **Compress to ZIP**: Toggle to package output into a ZIP archive.
 3. Click the submit button to begin generation.
-4. Watch the terminal output for progress and the completion summary.
-
----
-
-## Important Note
-
-- **Compress to ZIP**: The UI currently includes an option/button to output directly as a `.zip` archive. This feature is **under active development** and does not compress files yet. It will be added in an upcoming update.
+4. Watch the progress dialog and status popups for generation completion.
 
 ---
 
