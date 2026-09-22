@@ -11,6 +11,11 @@ FillContentMode = Literal[
 
 @dataclass
 class GeneratorConfig:
+
+    # Debug / Development Mode
+    debug: bool = True
+    """When True, relaxes strict path validation (e.g. allows relative paths like './')."""
+
     # Directory & Storage
     root_dir: str = r"./mock_environment"
     """The root directory path where mock folders will be generated."""
@@ -60,6 +65,7 @@ DEFAULT_CONFIG = GeneratorConfig()
 """Default configuration settings for mock folder and file generation.
 
 Available Attributes:
+- debug (bool): Debug mode flag, skips strict absolute path check (default: True).
 - root_dir (str): Base destination directory (default: './mock_environment').
 - compress_to_zip (bool): Compress folder to .zip on completion (default: False).
 - max_depth (int): Max directory recursion depth (0 = root only) (default: 4).

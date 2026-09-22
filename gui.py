@@ -1,7 +1,8 @@
-# gui.py
+from pathlib import Path
 from typing import Any, ContextManager, Optional, cast
 import dearpygui.dearpygui as dpg
 from config import DEFAULT_CONFIG, GeneratorConfig
+from popup import show_popup
 
 
 def get_config_ui() -> Optional[GeneratorConfig]:
@@ -33,7 +34,8 @@ def get_config_ui() -> Optional[GeneratorConfig]:
         dpg.set_value("max_depth_slider", clamped)
         dpg.set_value("max_depth_input", clamped)
 
-    def on_submit():
+    def commit_and_exit():
+        """Builds the final GeneratorConfig object and closes Dear PyGui."""
         nonlocal result_config
         raw_exts = dpg.get_value("f_extensions")
         parsed_exts = [
@@ -55,7 +57,87 @@ def get_config_ui() -> Optional[GeneratorConfig]:
             fill_content=dpg.get_value("fill_content"),
             compress_to_zip=dpg.get_value("compress_to_zip"),
         )
+
         dpg.stop_dearpygui()
+
+    def on_submit():
+        root_dir_str = dpg.get_value("root_dir").strip()
+
+        # Check 1: Is the path valid (non-empty, absolute path with a root/drive)?
+        target_path = Path(root_dir_str)
+        is_valid = DEFAULT_CONFIG.debug or (bool(root_dir_str) and target_path.is_absolute())
+
+        if not is_valid:
+            show_popup(
+                title="Invalid Path",
+                message=(
+                    f"'{root_dir_str}' is not a valid absolute directory path.\n\n"
+                    "Please provide a complete absolute path (e.g. 'C:\\dummy_folder')."
+                ),
+                popup_type="error",
+                buttons=[
+                    ("Change Path", browse_native_windows_folder),
+                    ("Cancel", None),
+                ],
+                width=460,
+                height=180,
+            )
+            return
+
+        # Check 2: Does the path exist?
+        if not target_path.exists():
+            def create_path_and_continue():
+                try:
+                    target_path.mkdir(parents=True, exist_ok=True)
+                    commit_and_exit()
+                except OSError as err:
+                    show_popup(
+                        title="Permission Error",
+                        message=f"Failed to create directory:\n{err}",
+                        popup_type="error",
+                        buttons=[("OK", None)],
+                    )
+
+            show_popup(
+                title="Path Does Not Exist",
+                message=(
+                    f"The provided path does not exist:\n'{root_dir_str}'\n\n"
+                    "Would you like to create this path, choose a new one, or cancel?"
+                ),
+                popup_type="warning",
+                buttons=[
+                    ("Create Path", create_path_and_continue),
+                    ("Select New Path", browse_native_windows_folder),
+                    ("Cancel", None),
+                ],
+                width=480,
+                height=190,
+            )
+            return
+
+        # Check 3: Is the existing folder empty?
+        if target_path.is_dir():
+            has_files = any(target_path.iterdir())
+            if has_files:
+                show_popup(
+                    title="Folder Not Empty",
+                    message=(
+                        f"The selected root folder is not empty:\n'{root_dir_str}'\n\n"
+                        "Are you sure you want to generate the files here?"
+                    ),
+                    popup_type="warning",
+                    buttons=[
+                        ("Generate Anyway", commit_and_exit),
+                        ("Select New Folder", browse_native_windows_folder),
+                        ("Cancel", None),
+                    ],
+                    width=480,
+                    height=190,
+                )
+                return
+
+        # Path is valid, exists, and is empty
+        commit_and_exit()
 
     dpg.create_context()
     dpg.create_viewport(
