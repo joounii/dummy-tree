@@ -8,13 +8,18 @@ FillContentMode = Literal[
     "Repeated ASCII Text",
 ]
 
+EnvironmentMode = Literal["dev", "prod"]
+
 
 @dataclass
 class GeneratorConfig:
+    # Environment & Validation Mode
+    environment: EnvironmentMode = "dev"
+    """Execution environment ('dev' or 'prod'). When 'dev', strict validations like absolute path requirements are relaxed."""
 
-    # Debug / Development Mode
-    debug: bool = True
-    """When True, relaxes strict path validation (e.g. allows relative paths like './')."""
+    # Console Output / Logging
+    verbose: bool = False
+    """Controls console output verbosity. When True, extra runtime information is printed to stdout."""
 
     # Directory & Storage
     root_dir: str = r"./mock_environment"
@@ -56,6 +61,11 @@ class GeneratorConfig:
     """Fill strategy: 'Zero Bytes (Instant)', 'Random Bytes', or 'Repeated ASCII Text'."""
 
     @property
+    def is_dev(self) -> bool:
+        """Helper to quickly check if dev validation rules apply."""
+        return self.environment == "dev"
+
+    @property
     def file_extensions_str(self) -> str:
         """Helper to format extensions as a comma-separated string for GUI inputs."""
         return ", ".join(self.file_extensions)
@@ -65,7 +75,8 @@ DEFAULT_CONFIG = GeneratorConfig()
 """Default configuration settings for mock folder and file generation.
 
 Available Attributes:
-- debug (bool): Debug mode flag, skips strict absolute path check (default: True).
+- environment (str): 'dev' or 'prod'. In 'dev', relative paths are allowed.
+- verbose (bool): Verbose console logging flag.
 - root_dir (str): Base destination directory (default: './mock_environment').
 - compress_to_zip (bool): Compress folder to .zip on completion (default: False).
 - max_depth (int): Max directory recursion depth (0 = root only) (default: 4).

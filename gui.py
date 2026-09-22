@@ -45,6 +45,8 @@ def get_config_ui() -> Optional[GeneratorConfig]:
         ]
 
         result_config = GeneratorConfig(
+            environment=DEFAULT_CONFIG.environment,
+            verbose=DEFAULT_CONFIG.verbose,
             root_dir=dpg.get_value("root_dir"),
             max_depth=dpg.get_value("max_depth_slider"),
             min_subfolders=dpg.get_value("min_subfolders"),
@@ -65,7 +67,7 @@ def get_config_ui() -> Optional[GeneratorConfig]:
 
         # Check 1: Is the path valid (non-empty, absolute path with a root/drive)?
         target_path = Path(root_dir_str)
-        is_valid = DEFAULT_CONFIG.debug or (bool(root_dir_str) and target_path.is_absolute())
+        is_valid = DEFAULT_CONFIG.is_dev or (bool(root_dir_str) and target_path.is_absolute())
 
         if not is_valid:
             show_popup(
